@@ -64,7 +64,8 @@
   input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: white; padding: 12px; font-family: 'Space Mono', monospace; outline: none; width: 100%; }
   select { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: white; padding: 12px; flex: 1; }
   button { border: none; border-radius: 10px; padding: 12px 20px; font-weight: 700; cursor: pointer; }
-  .btn-add { background: var(--fuel); color: #000; width: 100%; }
+  .btn-add { background: var(--fuel); color: #000; width: 100%; margin-bottom: 10px; }
+  .btn-reset { background: var(--danger); color: #fff; width: 100%; }
 
   .config-item { margin-bottom: 15px; padding: 10px; background: var(--surface2); border-radius: 10px; }
   .config-item label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; }
@@ -106,6 +107,7 @@
     <input type="number" id="expenseAmount" placeholder="Pesos gastados">
   </div>
   <button class="btn-add" onclick="addExpense()">Restar Gasto</button>
+  <button class="btn-reset" onclick="resetBudget()">🔄 Reiniciar Presupuesto</button>
 </div>
 
 <div id="configSection" class="hidden">
@@ -140,7 +142,7 @@
 
 <script>
 let state = JSON.parse(localStorage.getItem('gastos_v5')) || {
-  fuel: 0, market: 0, 
+  fuel: 0, market: 0,
   lastResetMonth: new Date().getMonth(),
   config: { litros: 0, ypf: 0, usd: 0, oficial: 0 }
 };
@@ -163,10 +165,21 @@ function checkAutoReset() {
 function addExpense() {
   const amt = parseFloat(document.getElementById('expenseAmount').value);
   const cat = document.getElementById('expenseCategory').value;
-  if(!amt) return;
+  if (!amt) return;
   state[cat] -= amt;
   document.getElementById('expenseAmount').value = '';
   showToast('Gasto restado');
+  save();
+}
+
+function resetBudget() {
+  if (!confirm('¿Reiniciar el presupuesto al valor configurado?')) return;
+  const f = (parseFloat(state.config.litros) || 0) * (parseFloat(state.config.ypf) || 0);
+  const m = (parseFloat(state.config.usd) || 0) * (parseFloat(state.config.oficial) || 0);
+  state.fuel = f;
+  state.market = m;
+  state.lastResetMonth = new Date().getMonth();
+  showToast('Presupuesto reiniciado');
   save();
 }
 
@@ -180,7 +193,6 @@ function updateConfigCalc() {
 function saveConfig() {
   const f = (parseFloat(document.getElementById('litros').value) || 0) * (parseFloat(document.getElementById('precioYPF').value) || 0);
   const m = (parseFloat(document.getElementById('dolares').value) || 0) * (parseFloat(document.getElementById('dolarOficial').value) || 0);
-  
   state.fuel = f;
   state.market = m;
   state.config = {
@@ -189,7 +201,6 @@ function saveConfig() {
     usd: document.getElementById('dolares').value,
     oficial: document.getElementById('dolarOficial').value
   };
-  
   showToast('Presupuesto aplicado');
   document.getElementById('configSection').classList.add('hidden');
   save();
@@ -198,7 +209,7 @@ function saveConfig() {
 function render() {
   document.getElementById('fuelBalance').textContent = '$' + Math.round(state.fuel).toLocaleString('es-AR');
   document.getElementById('marketBalance').textContent = '$' + Math.round(state.market).toLocaleString('es-AR');
-  
+
   const now = new Date();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const diff = lastDay - now.getDate();
