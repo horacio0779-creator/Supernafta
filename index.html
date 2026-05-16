@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Gastos</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #22222f;
+    --border: #2e2e42;
+    --fuel: #f97316;
+    --market: #22d3ee;
+    --text: #f0f0f8;
+    --muted: #6b6b85;
+    --success: #4ade80;
+    --danger: #f43f5e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 40px;
+  }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+  header h1 span { color: var(--fuel); }
+
+  .days-pill {
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 8px 18px;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .days-pill strong { color: var(--fuel); font-size: 1.2rem; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px;
+    position: relative; overflow: hidden;
+  }
+  .card-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .card-amount { font-family: 'Space Mono', monospace; font-size: 1.4rem; font-weight: 700; }
+  .card.fuel .card-amount { color: var(--fuel); }
+  .card.market .card-amount { color: var(--market); }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 16px; }
+  .panel-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  .input-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+  input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: white; padding: 12px; font-family: 'Space Mono', monospace; outline: none; width: 100%; }
+  select { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: white; padding: 12px; flex: 1; }
+  button { border: none; border-radius: 10px; padding: 12px 20px; font-weight: 700; cursor: pointer; }
+  .btn-add { background: var(--fuel); color: #000; width: 100%; }
+
+  .config-item { margin-bottom: 15px; padding: 10px; background: var(--surface2); border-radius: 10px; }
+  .config-item label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; }
+  .calc-res { font-family: 'Space Mono', monospace; font-size: 0.9rem; margin-top: 8px; text-align: right; color: var(--success); }
+
+  .hidden { display: none; }
+  .toggle-config { text-align: center; margin-top: 20px; color: var(--muted); font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); padding: 10px 20px; border-radius: 20px; color: var(--success); display: none; z-index: 1000; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Control de<br><span>Gastos</span></h1>
+  <div class="days-pill">📅 Faltan <strong id="daysLeft">--</strong> días</div>
+</header>
+
+<div class="cards">
+  <div class="card fuel">
+    <div class="card-label">⛽ Queda</div>
+    <div class="card-amount" id="fuelBalance">$0</div>
+  </div>
+  <div class="card market">
+    <div class="card-label">🛒 Queda</div>
+    <div class="card-amount" id="marketBalance">$0</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">Registrar Gasto</div>
+  <div class="input-row">
+    <select id="expenseCategory">
+      <option value="fuel">Combustible</option>
+      <option value="market">Supermercado</option>
+    </select>
+  </div>
+  <div class="input-row">
+    <input type="number" id="expenseAmount" placeholder="Pesos gastados">
+  </div>
+  <button class="btn-add" onclick="addExpense()">Restar Gasto</button>
+</div>
+
+<div id="configSection" class="hidden">
+  <div class="panel">
+    <div class="panel-title">Configuración Presupuesto</div>
+    
+    <div class="config-item">
+      <label>Combustible (Litros x Precio YPF)</label>
+      <div class="input-row">
+        <input type="number" id="litros" placeholder="Lts" oninput="updateConfigCalc()">
+        <input type="number" id="precioYPF" placeholder="Precio YPF" oninput="updateConfigCalc()">
+      </div>
+      <div class="calc-res" id="resFuel">$0</div>
+    </div>
+
+    <div class="config-item">
+      <label>Súper (U$S x Dólar Oficial)</label>
+      <div class="input-row">
+        <input type="number" id="dolares" placeholder="U$S" oninput="updateConfigCalc()">
+        <input type="number" id="dolarOficial" placeholder="Dólar Oficial" oninput="updateConfigCalc()">
+      </div>
+      <div class="calc-res" id="resMarket">$0</div>
+    </div>
+
+    <button onclick="saveConfig()" style="margin-top:10px; width:100%; background: var(--success); color: #000;">Aplicar y Guardar</button>
+  </div>
+</div>
+
+<div class="toggle-config" onclick="document.getElementById('configSection').classList.toggle('hidden')">Configurar Presupuesto</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let state = JSON.parse(localStorage.getItem('gastos_v5')) || {
+  fuel: 0, market: 0, 
+  lastResetMonth: new Date().getMonth(),
+  config: { litros: 0, ypf: 0, usd: 0, oficial: 0 }
+};
+
+function save() { localStorage.setItem('gastos_v5', JSON.stringify(state)); render(); }
+
+function checkAutoReset() {
+  const now = new Date();
+  if (now.getMonth() !== state.lastResetMonth) {
+    const f = (parseFloat(state.config.litros) || 0) * (parseFloat(state.config.ypf) || 0);
+    const m = (parseFloat(state.config.usd) || 0) * (parseFloat(state.config.oficial) || 0);
+    state.fuel = f;
+    state.market = m;
+    state.lastResetMonth = now.getMonth();
+    save();
+    showToast('Mes nuevo: Presupuesto reiniciado');
+  }
+}
+
+function addExpense() {
+  const amt = parseFloat(document.getElementById('expenseAmount').value);
+  const cat = document.getElementById('expenseCategory').value;
+  if(!amt) return;
+  state[cat] -= amt;
+  document.getElementById('expenseAmount').value = '';
+  showToast('Gasto restado');
+  save();
+}
+
+function updateConfigCalc() {
+  const f = (parseFloat(document.getElementById('litros').value) || 0) * (parseFloat(document.getElementById('precioYPF').value) || 0);
+  const m = (parseFloat(document.getElementById('dolares').value) || 0) * (parseFloat(document.getElementById('dolarOficial').value) || 0);
+  document.getElementById('resFuel').textContent = '$' + Math.round(f).toLocaleString('es-AR');
+  document.getElementById('resMarket').textContent = '$' + Math.round(m).toLocaleString('es-AR');
+}
+
+function saveConfig() {
+  const f = (parseFloat(document.getElementById('litros').value) || 0) * (parseFloat(document.getElementById('precioYPF').value) || 0);
+  const m = (parseFloat(document.getElementById('dolares').value) || 0) * (parseFloat(document.getElementById('dolarOficial').value) || 0);
+  
+  state.fuel = f;
+  state.market = m;
+  state.config = {
+    litros: document.getElementById('litros').value,
+    ypf: document.getElementById('precioYPF').value,
+    usd: document.getElementById('dolares').value,
+    oficial: document.getElementById('dolarOficial').value
+  };
+  
+  showToast('Presupuesto aplicado');
+  document.getElementById('configSection').classList.add('hidden');
+  save();
+}
+
+function render() {
+  document.getElementById('fuelBalance').textContent = '$' + Math.round(state.fuel).toLocaleString('es-AR');
+  document.getElementById('marketBalance').textContent = '$' + Math.round(state.market).toLocaleString('es-AR');
+  
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const diff = lastDay - now.getDate();
+  document.getElementById('daysLeft').textContent = diff < 0 ? 0 : diff + 1;
+
+  document.getElementById('litros').value = state.config.litros || '';
+  document.getElementById('precioYPF').value = state.config.ypf || '';
+  document.getElementById('dolares').value = state.config.usd || '';
+  document.getElementById('dolarOficial').value = state.config.oficial || '';
+  updateConfigCalc();
+}
+
+function showToast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+checkAutoReset();
+render();
+</script>
+</body>
+</html>
